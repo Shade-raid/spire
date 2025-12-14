@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Break the Spire - Incremental Idle Edition</title>
+<style>
+body {
+  margin: 0;
+  background: linear-gradient(to bottom, #0a0a1a, #1a1a2e);
+  color: #eee;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  overflow: hidden;
+}
+.screen {
+  display: none;
+  width: 750px;
+  height: 620px;
+  margin: 15px auto;
+  padding: 20px;
+  border: 2px solid #444;
+  background: linear-gradient(135deg, #1b1b1b, #252525);
+  position: relative;
+  border-radius: 8px;
+  box-shadow: 0 0 30px rgba(0,0,0,0.5);
+}
+.screen.active { display: block; }
+button {
+  background: linear-gradient(to bottom, #444, #333);
+  color: #eee;
+  border: 1px solid #666;
+  padding: 7px 12px;
+  margin: 3px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-size: 11px;
+  min-width: 140px;
+}
+button:hover { background: linear-gradient(to bottom, #555, #444); transform: translateY(-2px); }
+button:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+#stats {
+  background: rgba(0,0,0,0.3);
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+#log {
+  height: 90px;
+  overflow-y: auto;
+  border-top: 1px solid #444;
+  padding: 6px;
+  font-size: 10px;
+  text-align: left;
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+  margin-top: 8px;
+}
+.unit {
+  position: absolute;
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 6px currentColor;
+  transition: all 0.05s;
+}
+.tower {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 4px;
+}
+#spire {
+  position: absolute;
+  width: 60px;
+  height: 180px;
+  background: linear-gradient(to top, #555, #777);
+  left: 345px;
+  top: 220px;
+  border: 3px solid #999;
+  box-shadow: 0 0 40px rgba(100,100,100,0.5);
+  transition: background 0.5s;
+}
+#spire::before {
+  content: '';
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 30px solid transparent;
+  border-right: 30px solid transparent;
+  border-bottom: 30px solid #777;
+}
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin: 8px 0;
+}
+.section {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #444;
+}
+.section-title {
+  font-size: 12px;
+  color: #a78bfa;
+  margin: 4px 0;
+  font-weight: bold;
+}
+.phase-indicator {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(0,0,0,0.5);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  border: 1px solid #666;
+}
+.spire-hp-bar {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 18px;
+  background: #333;
+  border: 2px solid #666;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.spire-hp-fill {
+  height: 100%;
+  background: linear-gradient(to right, #ef4444, #f59e0b, #10b981);
+  transition: width 0.3s;
+}
+.damage-num {
+  position: absolute;
+  color: #fbbf24;
+  font-weight: bold;
+  font-size: 13px;
+  animation: float 1s forwards;
+  pointer-events: none;
+  text-shadow: 1px 1px 2px #000;
+}
+@keyframes float {
+  to { opacity: 0; transform: translateY(-30px); }
+}
+.unit-icon {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 8px;
+  justify-content: center;
+}
+.tab {
+  padding: 6px 12px;
+  cursor: pointer;
+  border: 1px solid #666;
+  border-radius: 4px 4px 0 0;
+  background: #2a2a2a;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+.tab:hover {
+  background: #3a3a3a;
+}
+.tab.active {
+  background: linear-gradient(to bottom, #555, #444);
+  border-bottom-color: #444;
+}
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+</style>
+</head>
+<body>
+
+<div id="splash" class="screen active">
+  <h1>⚔️ Break the Spire ⚔️</h1>
+  <p>Incremental Idle Edition</p>
+</div>
+
+<div id="menu" class="screen">
+  <h2>Main Menu</h2>
+  <button onclick="startGame()">⚔️ Start New Game</button><br>
+  <button onclick="showHelp()">📖 How to Play</button><br>
+  <button onclick="showCredits()">Credits</button>
+</div>
+
+<div id="help" class="screen">
+  <h2>How to Play</h2>
+  <div style="text-align:left;padding:0 30px;font-size:11px;line-height:1.5">
+    <p><b>Goal:</b> Build towers and train units to destroy the Spire!</p>
+    <p><b>Units (Manual Spawn):</b></p>
+    <ul style="margin:5px 0">
+      <li><span style="color:#a8dadc">👤 Villager</span> - Cheap worker (1 dmg)</li>
+      <li><span style="color:#fbbf24">⚔️ Knight</span> - Strong warrior (5 dmg)</li>
+      <li><span style="color:#f87171">🐴 Cavalry</span> - Fast & deadly (8 dmg)</li>
+      <li><span style="color:#a78bfa">🧙 Mage</span> - Powerful caster (12 dmg)</li>
+      <li><span style="color:#10b981">🐉 Dragon</span> - Ultimate unit (25 dmg!)</li>
+    </ul>
+    <p><b>Towers (Auto-Spawn):</b></p>
+    <ul style="margin:5px 0">
+      <li>Ballista - Spawns arrows automatically</li>
+      <li>Archer Tower - Spawns stronger bolts</li>
+      <li>Siege Tower - Spawns devastating boulders</li>
+    </ul>
+    <p><b>Strategy:</b> Mix manual units for burst damage with towers for steady DPS!</p>
+  </div>
+  <button onclick="showMenu()">Back</button>
+</div>
+
+<div id="game" class="screen">
+  <div class="phase-indicator" id="phase">Phase 1</div>
+  
+  <div id="stats">
+    <div>🪵 <span id="wood">0</span> (+<span id="wRate">0.5</span>/s) | 🪨 <span id="stone">0</span> (+<span id="sRate">0.3</span>/s)</div>
+    <div>🗼 <span id="towers">0</span> | ⚔️ <span id="units">0</span> | 💥 <span id="dps">0</span> DPS</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('units')">👥 Units</div>
+    <div class="tab" onclick="switchTab('towers')">🗼 Towers</div>
+    <div class="tab" onclick="switchTab('upgrades')">⬆️ Upgrades</div>
+  </div>
+
+  <div id="tab-units" class="tab-content active">
+    <div class="section-title">Spawn Units (Manual)</div>
+    <div class="controls">
+      <button onclick="spawnManual(1)" id="u1">
+        <span class="unit-icon" style="background:#a8dadc"></span>Villager<br>
+        <small>5W 5S - 1 dmg</small>
+      </button>
+      <button onclick="spawnManual(2)" id="u2">
+        <span class="unit-icon" style="background:#fbbf24"></span>Knight<br>
+        <small>15W 15S - 5 dmg</small>
+      </button>
+      <button onclick="spawnManual(3)" id="u3">
+        <span class="unit-icon" style="background:#f87171"></span>Cavalry<br>
+        <small>30W 30S - 8 dmg</small>
+      </button>
+    </div>
+    <div class="controls">
+      <button onclick="spawnManual(4)" id="u4">
+        <span class="unit-icon" style="background:#a78bfa"></span>Mage<br>
+        <small>50W 50S - 12 dmg</small>
+      </button>
+      <button onclick="spawnManual(5)" id="u5">
+        <span class="unit-icon" style="background:#10b981"></span>Dragon<br>
+        <small>100W 100S - 25 dmg</small>
+      </button>
+      <button onclick="spawnWave()" id="wave">
+        🌊 Spawn Wave<br>
+        <small>50W 50S - 10 units</small>
+      </button>
+    </div>
+  </div>
+
+  <div id="tab-towers" class="tab-content">
+    <div class="section-title">Build Towers (Auto-Spawn)</div>
+    <div class="controls">
+      <button onclick="build(1)" id="b1">Ballista<br><small>50W 50S</small></button>
+      <button onclick="build(2)" id="b2">Archer Tower<br><small>100W 100S</small></button>
+      <button onclick="build(3)" id="b3">Siege Tower<br><small>200W 200S</small></button>
+    </div>
+  </div>
+
+  <div id="tab-upgrades" class="tab-content">
+    <div class="section-title">Unit Upgrades</div>
+    <div class="controls">
+      <button onclick="upg('spd')" id="bSpd">Speed Lvl <span id="lSpd">0</span><br><small>100W 100S</small></button>
+      <button onclick="upg('dmg')" id="bDmg">Damage Lvl <span id="lDmg">0</span><br><small>150W 150S</small></button>
+      <button onclick="upg('spn')" id="bSpn">Spawn Lvl <span id="lSpn">0</span><br><small>200W 200S</small></button>
+    </div>
+  </div>
+
+  <div id="log"></div>
+  
+  <div id="spire">
+    <div class="spire-hp-bar">
+      <div class="spire-hp-fill" id="hpFill" style="width:100%"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;font-weight:bold" id="hpText">500/500</div>
+    </div>
+  </div>
+  
+  <div style="position:absolute;bottom:15px;left:15px;font-size:10px">
+    Time: <span id="time">0</span>s | Damage: <span id="totDmg">0</span>
+  </div>
+</div>
+
+<div id="win" class="screen">
+  <h2>🎉 Victory! 🎉</h2>
+  <p>The Spire has fallen!</p>
+  <div style="background:rgba(0,0,0,0.3);padding:15px;margin:20px">
+    Time: <span id="fTime">0</span>s<br>
+    Towers: <span id="fTowers">0</span><br>
+    Units Spawned: <span id="fUnits">0</span><br>
+    Total Damage: <span id="fDmg">0</span>
+  </div>
+  <button onclick="showMenu()">Menu</button>
+</div>
+
+<div id="credits" class="screen">
+  <h2>Credits</h2>
+  <p>Inspired by <em>Breaking the Tower</em><br>by Markus "Notch" Persson</p>
+  <button onclick="showMenu()">Back</button>
+</div>
+
+<script>
+function showScreen(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));document.getElementById(id).classList.add("active");}
+setTimeout(()=>showScreen("menu"),2000);
+
+let w,s,hp,twr,ph,gt,td,tu,us=[],ts=[],up={spd:0,dmg:0,spn:0},loop,dps=0,dmgs=[];
+let currentTab='units';
+
+// Manual unit types with costs
+const manualUnits={
+  1:{c:'#a8dadc',sp:1.0,d:1,cost:{w:5,s:5},name:'Villager'},
+  2:{c:'#fbbf24',sp:1.2,d:5,cost:{w:15,s:15},name:'Knight'},
+  3:{c:'#f87171',sp:1.8,d:8,cost:{w:30,s:30},name:'Cavalry'},
+  4:{c:'#a78bfa',sp:0.9,d:12,cost:{w:50,s:50},name:'Mage'},
+  5:{c:'#10b981',sp:1.1,d:25,cost:{w:100,s:100},name:'Dragon'}
+};
+
+// Tower auto-spawn units
+const ut={1:{c:'#fb4',sp:1.2,d:2},2:{c:'#6af',sp:1.5,d:5},3:{c:'#f77',sp:0.9,d:12}};
+const tt={1:{c:'#0a0',t:1,i:2000},2:{c:'#08f',t:2,i:2500},3:{c:'#f50',t:3,i:4000}};
+
+const els={
+  wood:document.getElementById("wood"),
+  stone:document.getElementById("stone"),
+  towers:document.getElementById("towers"),
+  units:document.getElementById("units"),
+  dps:document.getElementById("dps"),
+  wRate:document.getElementById("wRate"),
+  sRate:document.getElementById("sRate"),
+  log:document.getElementById("log"),
+  spire:document.getElementById("spire"),
+  phase:document.getElementById("phase"),
+  hpFill:document.getElementById("hpFill"),
+  hpText:document.getElementById("hpText"),
+  time:document.getElementById("time"),
+  totDmg:document.getElementById("totDmg"),
+  lSpd:document.getElementById("lSpd"),
+  lDmg:document.getElementById("lDmg"),
+  lSpn:document.getElementById("lSpn"),
+  game:document.getElementById("game")
+};
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelector(`.tab:nth-child(${tab==='units'?1:tab==='towers'?2:3})`).classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+}
+
+function lg(m){const e=document.createElement('div');e.textContent='• '+m;els.log.appendChild(e);els.log.scrollTop=els.log.scrollHeight;while(els.log.children.length>40)els.log.removeChild(els.log.firstChild);}
+
+function ui(){
+  els.wood.textContent=Math.floor(w);
+  els.stone.textContent=Math.floor(s);
+  els.towers.textContent=twr;
+  els.units.textContent=us.length;
+  els.dps.textContent=dps.toFixed(1);
+  els.totDmg.textContent=Math.floor(td);
+  els.time.textContent=Math.floor(gt);
+  els.wRate.textContent=(0.5*(1+up.spn*0.1)).toFixed(1);
+  els.sRate.textContent=(0.3*(1+up.spn*0.1)).toFixed(1);
+  els.lSpd.textContent=up.spd;
+  els.lDmg.textContent=up.dmg;
+  els.lSpn.textContent=up.spn;
+  
+  const p=hp/500*100;
+  els.hpFill.style.width=Math.max(0,p)+'%';
+  els.hpText.textContent=Math.max(0,Math.floor(hp))+'/500';
+  
+  // Update button states
+  for(let i=1;i<=5;i++){
+    const u=manualUnits[i];
+    document.getElementById('u'+i).disabled=w<u.cost.w||s<u.cost.s;
+  }
+  document.getElementById('wave').disabled=w<50||s<50;
+  document.getElementById('b1').disabled=w<50||s<50;
+  document.getElementById('b2').disabled=w<100||s<100;
+  document.getElementById('b3').disabled=w<200||s<200;
+  document.getElementById('bSpd').disabled=w<100||s<100;
+  document.getElementById('bDmg').disabled=w<150||s<150;
+  document.getElementById('bSpn').disabled=w<200||s<200;
+  
+  if(ph===1){
+    els.phase.textContent='Phase 1';
+    els.phase.style.background='rgba(74,222,128,0.2)';
+    els.phase.style.color='#4ade80';
+  }else if(ph===2){
+    els.phase.textContent='Phase 2';
+    els.phase.style.background='rgba(251,191,36,0.2)';
+    els.phase.style.color='#fbbf24';
+  }else if(ph===3){
+    els.phase.textContent='Phase 3';
+    els.phase.style.background='rgba(239,68,68,0.2)';
+    els.phase.style.color='#ef4444';
+  }else{
+    els.phase.textContent='CRITICAL';
+    els.phase.style.background='rgba(139,92,246,0.2)';
+    els.phase.style.color='#8b5cf6';
+  }
+}
+
+function startGame(){
+  w=0;s=0;hp=500;twr=0;ph=1;gt=0;td=0;tu=0;us=[];ts=[];up={spd:0,dmg:0,spn:0};dps=0;dmgs=[];
+  els.log.innerHTML="";
+  showScreen("game");
+  lg("Train units manually or build auto-spawning towers!");
+  lg("Try different unit types for varied strategies!");
+  document.querySelectorAll(".unit,.tower,.damage-num").forEach(e=>e.remove());
+  clearInterval(loop);
+  loop=setInterval(tick,50);
+}
+
+function showMenu(){clearInterval(loop);document.querySelectorAll(".unit,.tower,.damage-num").forEach(e=>e.remove());showScreen("menu");}
+function showCredits(){showScreen("credits");}
+function showHelp(){showScreen("help");}
+
+function spawnManual(type){
+  const u=manualUnits[type];
+  if(w>=u.cost.w&&s>=u.cost.s){
+    w-=u.cost.w;
+    s-=u.cost.s;
+    lg('Spawned '+u.name);
+    const a=Math.random()*Math.PI*2;
+    const d=180+Math.random()*60;
+    const x=375+Math.cos(a)*d;
+    const y=310+Math.sin(a)*d;
+    createUnit(x,y,type,true);
+    ui();
+  }
+}
+
+function spawnWave(){
+  if(w>=50&&s>=50){
+    w-=50;
+    s-=50;
+    lg('🌊 Spawned attack wave!');
+    for(let i=0;i<10;i++){
+      setTimeout(()=>{
+        const a=Math.random()*Math.PI*2;
+        const d=180+Math.random()*60;
+        const x=375+Math.cos(a)*d;
+        const y=310+Math.sin(a)*d;
+        createUnit(x,y,1,true);
+      },i*100);
+    }
+    ui();
+  }
+}
+
+function build(lv){
+  const c=lv===1?50:lv===2?100:200;
+  if(w>=c&&s>=c){
+    w-=c;s-=c;twr++;
+    lg('Built '+(lv===1?'Ballista':lv===2?'Archer':'Siege')+' Tower');
+    const t=document.createElement("div");
+    t.classList.add("tower");
+    t.style.background=tt[lv].c;
+    const a=Math.random()*Math.PI*2;
+    const d=150+Math.random()*80;
+    const x=375+Math.cos(a)*d;
+    const y=310+Math.sin(a)*d;
+    t.style.left=x+"px";
+    t.style.top=y+"px";
+    els.game.appendChild(t);
+    ts.push({el:t,cfg:tt[lv],last:Date.now(),x:x,y:y});
+    ui();
+  }
+}
+
+function upg(t){
+  const c={spd:100,dmg:150,spn:200}[t];
+  if(w>=c&&s>=c){
+    w-=c;s-=c;up[t]++;
+    lg('Upgraded '+(t==='spd'?'Speed':t==='dmg'?'Damage':'Spawn'));
+    ui();
+  }
+}
+
+function createUnit(x,y,type,manual){
+  const u=document.createElement("div");
+  u.classList.add("unit");
+  if(manual){
+    u.style.background=manualUnits[type].c;
+    u.style.width='12px';
+    u.style.height='12px';
+  }else{
+    u.style.background=ut[type].c;
+  }
+  u.style.left=x+"px";
+  u.style.top=y+"px";
+  els.game.appendChild(u);
+  us.push({el:u,x:x,y:y,type:type,manual:manual});
+  tu++;
+}
+
+function showDmg(x,y,d){
+  const e=document.createElement("div");
+  e.classList.add("damage-num");
+  e.textContent=Math.floor(d);
+  e.style.left=x+"px";
+  e.style.top=y+"px";
+  els.game.appendChild(e);
+  setTimeout(()=>e.remove(),1000);
+}
+
+function tick(){
+  gt+=0.05;
+  const rb=1+up.spn*0.1;
+  w+=0.5*rb*0.05;
+  s+=0.3*rb*0.05;
+  
+  const n=Date.now();
+  ts.forEach(t=>{
+    const iv=t.cfg.i*Math.pow(0.85,up.spn);
+    if(n-t.last>iv){
+      createUnit(t.x+9,t.y+9,t.cfg.t,false);
+      t.last=n;
+    }
+  });
+  
+  const cx=375,cy=310;
+  for(let i=us.length-1;i>=0;i--){
+    const u=us[i];
+    const uData=u.manual?manualUnits[u.type]:ut[u.type];
+    const dx=cx-u.x,dy=cy-u.y;
+    const dt=Math.sqrt(dx*dx+dy*dy);
+    const sp=uData.sp*(1+0.15*up.spd);
+    if(dt>5){
+      u.x+=dx/dt*sp;
+      u.y+=dy/dt*sp;
+      u.el.style.left=u.x+"px";
+      u.el.style.top=u.y+"px";
+    }else{
+      const dmg=uData.d*(1+0.2*up.dmg);
+      hp-=dmg;
+      td+=dmg;
+      dmgs.push({d:dmg,t:n});
+      showDmg(u.x,u.y,dmg);
+      u.el.remove();
+      us.splice(i,1);
+    }
+  }
+  
+  dmgs=dmgs.filter(d=>n-d.t<1000);
+  dps=dmgs.reduce((a,d)=>a+d.d,0);
+  
+  const op=ph;
+  if(hp>375)ph=1;
+  else if(hp>250)ph=2;
+  else if(hp>125)ph=3;
+  else ph=4;
+  
+  if(ph!==op){
+    lg('⚠️ Phase '+ph+'!');
+    if(ph===1)els.spire.style.background="linear-gradient(to top,#555,#777)";
+    else if(ph===2)els.spire.style.background="linear-gradient(to top,#755,#966)";
+    else if(ph===3)els.spire.style.background="linear-gradient(to top,#933,#c44)";
+    else els.spire.style.background="linear-gradient(to top,#700,#900)";
+  }
+  
+  if(Math.random()<0.002*ph){
+    const l=Math.min(w,5+ph*2);
+    w-=l;s-=l;
+    lg('💥 Spire counterattacks!');
+  }
+  
+  if(ph>=3&&Math.random()<0.001&&ts.length>0){
+    const t=ts[Math.floor(Math.random()*ts.length)];
+    t.el.remove();
+    ts.splice(ts.indexOf(t),1);
+    twr--;
+    lg('🔥 Tower destroyed!');
+  }
+  
+  if(hp<=0){
+    clearInterval(loop);
+    document.getElementById('fTime').textContent=Math.floor(gt);
+    document.getElementById('fTowers').textContent=twr;
+    document.getElementById('fUnits').textContent=tu;
+    document.getElementById('fDmg').textContent=Math.floor(td);
+    document.querySelectorAll(".unit,.tower,.damage-num").forEach(e=>e.remove());
+    showScreen("win");
+  }
+  
+  ui();
+}
+</script>
+</body>
+</html>
